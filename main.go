@@ -1,16 +1,25 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/gin-gonic/gin"
+	"github.com/jmorganca/ollama/format"
+	"github.com/jmorganca/ollama/server"
 	"github.com/joho/godotenv"
 	"github.com/sausheong/ishell/v2"
+	"golang.org/x/crypto/ssh"
 )
 
 var model string
@@ -27,6 +36,8 @@ func init() {
 		log.Fatal("Error loading .env file")
 	}
 	model = os.Getenv("MODEL")
+	gin.SetMode(gin.ReleaseMode)
+	go startOllamaServer()
 }
 
 func main() {
@@ -37,10 +48,10 @@ func main() {
 	shell.SetPrompt(getPrompt())
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "sh",
+		Name: "shell",
 		Help: "run shell commands",
 		Func: func(c *ishell.Context) {
-			c.Print(cyan("sh> "))
+			c.Print(cyan("shell> "))
 			line := c.ReadLine()
 			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
@@ -63,10 +74,26 @@ func main() {
 	})
 
 	shell.AddCmd(&ishell.Cmd{
-		Name: "search",
-		Help: "search the Internet to answer a question.",
+		Name: "ask",
+		Help: "ask waldo",
 		Func: func(c *ishell.Context) {
-			c.Print(cyan("se> "))
+			c.Print(cyan("ask> "))
+			line := c.ReadLine()
+			defer c.SetPrompt(getPrompt())
+			if line == "" || line == "exit" {
+				c.Println(red("no question, will exit."))
+				return
+			}
+			ask(model, line)
+			c.Cmd.Func(c)
+		},
+	})
+
+	shell.AddCmd(&ishell.Cmd{
+		Name: "search",
+		Help: "search the Internet",
+		Func: func(c *ishell.Context) {
+			c.Print(cyan("search> "))
 			line := c.ReadLine()
 			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
@@ -81,10 +108,10 @@ func main() {
 		},
 	})
 
-	// exit ghost
+	// exit walso
 	shell.AddCmd(&ishell.Cmd{
 		Name: "exit",
-		Help: "exit waldo.",
+		Help: "exit waldo",
 		Func: exit,
 	})
 
@@ -105,6 +132,17 @@ func main() {
 		},
 	})
 
+	shell.AddCmd(&ishell.Cmd{
+		Name: "info",
+		Help: "information about Waldo",
+		Func: func(c *ishell.Context) {
+			c.Println(yellow("Waldo is a AI assistant that is able answer questions or to search on the Internet"))
+			c.Println(yellow("LLM:"), cyan(model))
+			c.SetPrompt(getPrompt())
+			c.Println()
+		},
+	})
+
 	// start shell
 	shell.Run()
 	// teardown
@@ -117,12 +155,12 @@ func exit(c *ishell.Context) {
 }
 
 func getPrompt() string {
-	return "wa> "
+	return "waldo> "
 }
 
 func getModels() ([]string, error) {
 	models := &Models{}
-	httpResp, err := http.Get("http://localhost:11434/api/tags")
+	httpResp, err := http.Get("http://localhost:11435/api/tags")
 	if err != nil {
 		fmt.Println("err in calling ollama:", err)
 		return []string{}, err
@@ -140,4 +178,79 @@ func getModels() ([]string, error) {
 	}
 
 	return results, nil
+}
+
+// the code below are taken from Ollama to enable the Waldo to
+// start an Ollama server within waldo
+
+// start the OllamaServer
+func startOllamaServer() error {
+	host, port, err := net.SplitHostPort(os.Getenv("OLLAMA_HOST"))
+	if err != nil {
+		host, port = "127.0.0.1", "11435"
+		if ip := net.ParseIP(strings.Trim(os.Getenv("OLLAMA_HOST"), "[]")); ip != nil {
+			host = ip.String()
+		}
+	}
+
+	if err := initializeKeypair(); err != nil {
+		return err
+	}
+
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, port))
+	if err != nil {
+		return err
+	}
+
+	return server.Serve(ln)
+}
+
+// initialize the kepair
+func initializeKeypair() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	privKeyPath := filepath.Join(home, ".ollama", "id_ed25519")
+	pubKeyPath := filepath.Join(home, ".ollama", "id_ed25519.pub")
+
+	_, err = os.Stat(privKeyPath)
+	if os.IsNotExist(err) {
+		fmt.Printf("Couldn't find '%s'. Generating new private key.\n", privKeyPath)
+		_, privKey, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return err
+		}
+
+		privKeyBytes, err := format.OpenSSHPrivateKey(privKey, "")
+		if err != nil {
+			return err
+		}
+
+		err = os.MkdirAll(filepath.Dir(privKeyPath), 0o755)
+		if err != nil {
+			return fmt.Errorf("could not create directory %w", err)
+		}
+
+		err = os.WriteFile(privKeyPath, pem.EncodeToMemory(privKeyBytes), 0o600)
+		if err != nil {
+			return err
+		}
+
+		sshPrivateKey, err := ssh.NewSignerFromKey(privKey)
+		if err != nil {
+			return err
+		}
+
+		pubKeyData := ssh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())
+
+		err = os.WriteFile(pubKeyPath, pubKeyData, 0o644)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Your new public key is: \n\n%s\n", string(pubKeyData))
+	}
+	return nil
 }

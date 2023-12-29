@@ -7,6 +7,7 @@ import (
 type SearchResult struct {
 	Title string
 	Info  string
+	Url   string
 }
 
 type CommandResponse struct {
