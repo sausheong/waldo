@@ -56,6 +56,7 @@ Type `help` on the `waldo` prompt to see the commands.
 
 ```
 Commands:
+  add         add a new model to Waldo
   ask         ask waldo
   clear       clear the screen
   exit        exit waldo
@@ -63,5 +64,5 @@ Commands:
   info        information about Waldo
   search      search the Internet
   shell       run shell commands
-  switch      switch to a different model.
+  switch      switch to a different model
 ```
