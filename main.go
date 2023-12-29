@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
@@ -12,9 +13,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
+	"github.com/hako/durafmt"
 	"github.com/jmorganca/ollama/format"
 	"github.com/jmorganca/ollama/server"
 	"github.com/joho/godotenv"
@@ -117,7 +120,7 @@ func main() {
 
 	shell.AddCmd(&ishell.Cmd{
 		Name: "switch",
-		Help: "switch to a different model.",
+		Help: "switch to a different model",
 		Func: func(c *ishell.Context) {
 			choices, err := getModels()
 			if err != nil {
@@ -133,10 +136,29 @@ func main() {
 	})
 
 	shell.AddCmd(&ishell.Cmd{
+		Name: "add",
+		Help: "add a new model to Waldo",
+		Func: func(c *ishell.Context) {
+			c.Print(cyan("model name? "))
+			line := c.ReadLine()
+			defer c.SetPrompt(getPrompt())
+			if line == "" || line == "exit" {
+				c.Println(red("no model provided, will exit."))
+				return
+			}
+			err := pullModel(line)
+			if err != nil {
+				c.Println(red(err))
+			}
+			c.Println()
+		},
+	})
+
+	shell.AddCmd(&ishell.Cmd{
 		Name: "info",
 		Help: "information about Waldo",
 		Func: func(c *ishell.Context) {
-			c.Println(yellow("Waldo is a AI assistant that is able answer questions or to search on the Internet"))
+			c.Println(yellow("Waldo is a simple command line application that allows you to ask questions and search the Internet."))
 			c.Println(yellow("LLM:"), cyan(model))
 			c.SetPrompt(getPrompt())
 			c.Println()
@@ -156,6 +178,42 @@ func exit(c *ishell.Context) {
 
 func getPrompt() string {
 	return "waldo> "
+}
+
+func pullModel(name string) error {
+	reqJson := `{
+	"name": "` + name + `"
+}`
+	r := bytes.NewReader([]byte(reqJson))
+	httpResp, err := http.Post("http://localhost:11435/api/pull", "application/json", r)
+	if err != nil {
+		fmt.Println("err in calling ollama:", err)
+		return err
+	}
+	decoder := json.NewDecoder(httpResp.Body)
+	t0 := time.Now()
+	for {
+		resp := &PullResponse{}
+		decoder.Decode(&resp)
+		if resp.Status == "success" {
+			elapsed := durafmt.Parse(time.Since(t0)).LimitFirstN(2)
+			fmt.Print("\033[2K\r")
+			fmt.Printf(cyan("success\n(%s)"), elapsed)
+			fmt.Println()
+			break
+		} else {
+			if resp.Status[0:7] == "pulling" {
+				fmt.Print("\033[2K\r")
+				percentage := float64(resp.Completed) * 100.0 / float64(resp.Total)
+				if percentage < 100.0 && percentage != 0.0 {
+					fmt.Printf(cyan("downloading ... %.1f%%"), percentage)
+				}
+			} else {
+				fmt.Println(cyan(resp.Status))
+			}
+		}
+	}
+	return err
 }
 
 func getModels() ([]string, error) {

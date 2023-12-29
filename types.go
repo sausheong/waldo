@@ -41,6 +41,13 @@ type CompletionResponse struct {
 	EvalDuration       time.Duration `json:"eval_duration,omitempty"`
 }
 
+type PullResponse struct {
+	Status    string `json:"status"`
+	Digest    string `json:"digest"`
+	Total     int64  `json:"total"`
+	Completed int64  `json:"completed"`
+}
+
 type ImageQuery struct {
 	Query    string `json:"query"`
 	Filepath string `json:"filepath"`
