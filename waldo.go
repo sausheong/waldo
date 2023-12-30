@@ -2,17 +2,25 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/google/generative-ai-go/genai"
 	"github.com/hako/durafmt"
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/schema"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 func run(tool string, args []string) ([]byte, error) {
@@ -46,8 +54,81 @@ the answer, say "I don't know the answer to this.".
 	return predict(model, prompt, query, "")
 }
 
-// predict by calling Ollama with a given model
 func predict(model string, prompt string, ctx string, format string) error {
+	switch model {
+	case "gpt-3.5-turbo":
+		return gpt(model, prompt, ctx, format)
+	case "gpt-4":
+		return gpt(model, prompt, ctx, format)
+	case "gpt-4-turbo":
+		return gpt("gpt-4-1106-preview", prompt, ctx, format)
+	case "gpt-4-vision":
+		return gpt("gpt-4-vision-preview", prompt, ctx, format)
+	case "gemini-pro":
+		return gemini(model, prompt, ctx, format)
+	default:
+		return ollama(model, prompt, ctx, format)
+	}
+}
+
+func gpt(model string, prompt string, ctx string, format string) error {
+	llm, err := openai.NewChat()
+	if err != nil {
+		return err
+	}
+	c := context.Background()
+	_, err = llm.Call(c, []schema.ChatMessage{
+		schema.SystemChatMessage{Content: prompt},
+		schema.HumanChatMessage{Content: ctx},
+	}, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+		fmt.Print(string(chunk))
+		return nil
+	}),
+	)
+	if err != nil {
+		return err
+	}
+	fmt.Println()
+
+	return nil
+}
+
+func gemini(model string, prompt string, ctx string, format string) error {
+	fmt.Println("predicted by gemini-pro")
+	c := context.Background()
+	client, err := genai.NewClient(c, option.WithAPIKey(os.Getenv("GOOGLEAPI_API_KEY")))
+	if err != nil {
+		fmt.Println("cannot create Gemini client:", err)
+		return err
+	}
+	defer client.Close()
+
+	gemini := client.GenerativeModel("models/gemini-pro")
+	fmt.Println("gemini:", gemini)
+	iter := gemini.GenerateContentStream(c, genai.Text(prompt), genai.Text(ctx))
+	for {
+		fmt.Println("iteration")
+		resp, err := iter.Next()
+		fmt.Println(resp)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		for _, cand := range resp.Candidates {
+			if cand.Content != nil {
+				for _, part := range cand.Content.Parts {
+					fmt.Println(part)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// predict by calling Ollama with a given model
+func ollama(model string, prompt string, ctx string, format string) error {
 	req := &CompletionRequest{
 		Model:  model,
 		Prompt: prompt,

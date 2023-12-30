@@ -84,7 +84,6 @@ func main() {
 			line := c.ReadLine()
 			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
-				c.Println(red("no question, will exit."))
 				return
 			}
 			ask(model, line)
@@ -100,7 +99,6 @@ func main() {
 			line := c.ReadLine()
 			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
-				c.Println(red("no question, will exit."))
 				return
 			}
 			err := search(model, line)
@@ -143,7 +141,6 @@ func main() {
 			line := c.ReadLine()
 			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
-				c.Println(red("no model provided, will exit."))
 				return
 			}
 			err := pullModel(line)
@@ -158,8 +155,7 @@ func main() {
 		Name: "info",
 		Help: "information about Waldo",
 		Func: func(c *ishell.Context) {
-			c.Println(yellow("Waldo is a simple command line application that allows you to ask questions and search the Internet."))
-			c.Println(yellow("LLM:"), cyan(model))
+			c.Println(yellow("model:"), cyan(model))
 			c.SetPrompt(getPrompt())
 			c.Println()
 		},
@@ -230,7 +226,7 @@ func getModels() ([]string, error) {
 		return []string{}, err
 	}
 
-	results := []string{}
+	results := []string{"gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4-vision", "gemini-pro"}
 	for _, m := range models.Models {
 		results = append(results, m.Name)
 	}
