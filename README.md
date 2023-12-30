@@ -2,7 +2,7 @@
 
 <img src="assets/waldo.png" width="128px">
 
-Waldo is a simple command line application that allows you to ask questions and search the Internet. It wraps around the DuckDuckGo search engine and the Ollama LLM framework.
+Waldo is a simple command line application that allows you to ask questions and search the Internet. It wraps around the [DuckDuckGo](https://duckduckgo.com) search engine, the [Ollama](https://github.com/jmorganca/ollama) LLM framework, OpenAI's GPT models as well as Google's Gemini model.
 
 
 # Building
@@ -25,7 +25,7 @@ $ go generate ./...
 Then build the binary:
 
 ```
-$go build .
+$ go build .
 ```
 
 ## Linux
