@@ -75,6 +75,7 @@ func predict(model string, prompt string, ctx string, format string) error {
 // Call OpenAI APIs to predict
 // uses langchaingo
 func gpt(model string, prompt string, ctx string, format string) error {
+	t0 := time.Now()
 	llm, err := openai.NewChat(openai.WithModel(model))
 	if err != nil {
 		return err
@@ -91,6 +92,8 @@ func gpt(model string, prompt string, ctx string, format string) error {
 	if err != nil {
 		return err
 	}
+	elapsed := durafmt.Parse(time.Since(t0)).LimitFirstN(2)
+	fmt.Printf(cyan("\n\n(%s)"), elapsed)
 	fmt.Println()
 
 	return nil
@@ -99,8 +102,7 @@ func gpt(model string, prompt string, ctx string, format string) error {
 // call Gemini API to predict
 func gemini(model string, prompt string, ctx string, format string) error {
 	t0 := time.Now()
-	c := context.Background()
-	client, err := genai.NewClient(c, option.WithAPIKey(os.Getenv("GOOGLEAI_API_KEY")))
+	client, err := genai.NewClient(context.Background(), option.WithAPIKey(os.Getenv("GOOGLEAI_API_KEY")))
 	if err != nil {
 		fmt.Println("cannot create Gemini client:", err)
 		return err
