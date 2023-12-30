@@ -110,7 +110,7 @@ func gemini(model string, prompt string, ctx string, format string) error {
 	defer client.Close()
 
 	gemini := client.GenerativeModel(model)
-	iter := gemini.GenerateContentStream(c, genai.Text(prompt), genai.Text(ctx))
+	iter := gemini.GenerateContentStream(context.Background(), genai.Text(prompt), genai.Text(ctx))
 	for {
 		resp, err := iter.Next()
 		if err == iterator.Done {
