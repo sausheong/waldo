@@ -26,6 +26,7 @@ import (
 )
 
 var model string
+var imageFilepath string
 
 var cyan = color.New(color.FgCyan).SprintFunc()
 var yellow = color.New(color.FgHiYellow).SprintFunc()
@@ -108,6 +109,37 @@ func main() {
 		},
 	})
 
+	// ask question about images
+	shell.AddCmd(&ishell.Cmd{
+		Name: "image",
+		Help: "ask questions about an image file",
+		Func: func(c *ishell.Context) {
+			if !isImageModel() {
+				c.Println(red("Please switch to an image model like llava or GPT4-Vision first."))
+				return
+			}
+			c.Print(cyan("image> "))
+			line := c.ReadLine()
+			defer c.SetPrompt(getPrompt())
+			if line == "" || line == "exit" {
+				return
+			}
+			if imageFilepath == "" {
+				q, err := query(model, line)
+				if err != nil {
+					c.Println(red("error when processing image query:", err))
+					return
+				}
+				imageFilepath = q.Filepath
+				if q.Query != "" {
+					qa(model, q.Query, imageFilepath)
+				}
+			}
+			qa(model, line, imageFilepath)
+			c.Cmd.Func(c)
+		},
+	})
+
 	// exit walso
 	shell.AddCmd(&ishell.Cmd{
 		Name: "exit",
@@ -175,6 +207,10 @@ func getPrompt() string {
 	return "waldo> "
 }
 
+func isImageModel() bool {
+	return strings.Contains(model, "llava")
+}
+
 func pullModel(name string) error {
 	reqJson := `{
 	"name": "` + name + `"
@@ -225,7 +261,7 @@ func getModels() ([]string, error) {
 		return []string{}, err
 	}
 
-	results := []string{"gpt-3.5-turbo*", "gpt-4*", "gpt-4-turbo*", "gpt-4-vision*", "gemini-pro*"}
+	results := []string{"gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4-vision", "gemini-pro"}
 	for _, m := range models.Models {
 		results = append(results, m.Name)
 	}

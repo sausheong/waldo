@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -71,8 +72,10 @@ func predict(model string, prompt string, ctx string, format string) error {
 	}
 }
 
+// Call OpenAI APIs to predict
+// uses langchaingo
 func gpt(model string, prompt string, ctx string, format string) error {
-	llm, err := openai.NewChat()
+	llm, err := openai.NewChat(openai.WithModel(model))
 	if err != nil {
 		return err
 	}
@@ -83,7 +86,7 @@ func gpt(model string, prompt string, ctx string, format string) error {
 	}, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
 		fmt.Print(string(chunk))
 		return nil
-	}),
+	}), llms.WithMinLength(1024),
 	)
 	if err != nil {
 		return err
@@ -93,33 +96,37 @@ func gpt(model string, prompt string, ctx string, format string) error {
 	return nil
 }
 
+// call Gemini API to predict
 func gemini(model string, prompt string, ctx string, format string) error {
-	fmt.Println("predicted by gemini-pro")
+	t0 := time.Now()
 	c := context.Background()
-	client, err := genai.NewClient(c, option.WithAPIKey(os.Getenv("GOOGLEAPI_API_KEY")))
+	client, err := genai.NewClient(c, option.WithAPIKey(os.Getenv("GOOGLEAI_API_KEY")))
 	if err != nil {
 		fmt.Println("cannot create Gemini client:", err)
 		return err
 	}
 	defer client.Close()
 
-	gemini := client.GenerativeModel("models/gemini-pro")
-	fmt.Println("gemini:", gemini)
+	gemini := client.GenerativeModel(model)
 	iter := gemini.GenerateContentStream(c, genai.Text(prompt), genai.Text(ctx))
 	for {
-		fmt.Println("iteration")
 		resp, err := iter.Next()
-		fmt.Println(resp)
 		if err == iterator.Done {
+			elapsed := durafmt.Parse(time.Since(t0)).LimitFirstN(2)
+			fmt.Printf(cyan("\n\n(%s)"), elapsed)
+			fmt.Println()
 			break
 		}
 		if err != nil {
+			fmt.Println("cannot generate content:", err)
 			return err
 		}
 		for _, cand := range resp.Candidates {
 			if cand.Content != nil {
 				for _, part := range cand.Content.Parts {
-					fmt.Println(part)
+					if part != nil {
+						fmt.Print(part)
+					}
 				}
 			}
 		}
@@ -214,4 +221,94 @@ func ddg(query string) (string, []SearchResult, error) {
 			"Description: %s\n\n", result.Title, result.Info)
 	}
 	return formattedResults, results, nil
+}
+
+func qa(model string, ctx string, filepath string) error {
+	prompt := `You are a helpful AI image assistant who can answer questions about
+a given image.`
+
+	req := &CompletionRequest{
+		Model:  model,
+		Prompt: prompt,
+		System: ctx,
+		Stream: true,
+	}
+
+	// Read the entire file into a byte slice
+	file, err := os.ReadFile(filepath)
+	if err != nil {
+		fmt.Println("err in getting bytes from image file", err, filepath)
+	}
+	req.Images = []string{base64.StdEncoding.EncodeToString(file)}
+
+	reqJson, err := json.Marshal(req)
+	if err != nil {
+		fmt.Println("err in marshaling:", err)
+		return err
+	}
+
+	r := bytes.NewReader(reqJson)
+	httpResp, err := http.Post("http://localhost:11435/api/generate", "application/json", r)
+	if err != nil {
+		fmt.Println("err in calling ollama:", err)
+		return err
+	}
+	decoder := json.NewDecoder(httpResp.Body)
+	t0 := time.Now()
+	for {
+		resp := &CompletionResponse{}
+		decoder.Decode(&resp)
+		fmt.Print(yellow(resp.Response))
+		if resp.Done {
+			elapsed := durafmt.Parse(time.Since(t0)).LimitFirstN(2)
+			fmt.Printf(cyan("\n\n(%s)"), elapsed)
+			break
+		}
+	}
+	return err
+}
+
+func query(model string, ctx string) (ImageQuery, error) {
+	query := ImageQuery{}
+	prompt := `You are a helpful AI image assistant who can answer questions about
+a given image. When the user asks a question about the image Return the JSON response 
+with the following format:
+--
+{
+	"query" : <query from the user>
+	"filepath": <the path of the file to be queried upon>
+}
+`
+	req := &CompletionRequest{
+		Model:  model,
+		Prompt: prompt,
+		System: ctx,
+		Stream: false,
+		Format: "json",
+	}
+
+	reqJson, err := json.Marshal(req)
+	if err != nil {
+		fmt.Println("err in marshaling:", err)
+		return query, err
+	}
+
+	r := bytes.NewReader(reqJson)
+	httpResp, err := http.Post("http://localhost:11435/api/generate", "application/json", r)
+	if err != nil {
+		fmt.Println("err in calling ollama:", err)
+		return query, err
+	}
+	decoder := json.NewDecoder(httpResp.Body)
+	resp := CompletionResponse{}
+	err = decoder.Decode(&resp)
+	if err != nil {
+		log.Println("Cannot decode completion response:", err)
+		return query, err
+	}
+	err = json.Unmarshal([]byte(resp.Response), &query)
+	if err != nil {
+		log.Println("Cannot unmarshal image query:", err)
+	}
+	return query, err
 }
