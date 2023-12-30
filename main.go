@@ -58,7 +58,6 @@ func main() {
 			line := c.ReadLine()
 			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
-				c.Println(red("no command, will exit."))
 				return
 			}
 			args := strings.Split(line, " ")
@@ -226,7 +225,7 @@ func getModels() ([]string, error) {
 		return []string{}, err
 	}
 
-	results := []string{"gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4-vision", "gemini-pro"}
+	results := []string{"gpt-3.5-turbo*", "gpt-4*", "gpt-4-turbo*", "gpt-4-vision*", "gemini-pro*"}
 	for _, m := range models.Models {
 		results = append(results, m.Name)
 	}
