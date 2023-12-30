@@ -125,7 +125,7 @@ func main() {
 				c.Println(red("model not switched."))
 				return
 			}
-			choice := c.MultiChoice(choices, cyan("Which model to use?"))
+			choice := c.MultiChoice(choices, cyan("Your current model is ")+yellow(model)+cyan(". Which model to switch to?"))
 			model = choices[choice]
 			c.SetPrompt(getPrompt())
 			c.Println()

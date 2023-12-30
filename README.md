@@ -90,6 +90,27 @@ waldo>
 
 You can switch to any of the local models that you have downloaded and added to Waldo. If you want to use OpenAI or Google Gemini, please get an API key first, then add it into the `.env` file.
 
+```
+Your current model is llama2:7b-chat. Which model to switch to?
+ ❯ gpt-3.5-turbo*
+   gpt-4*
+   gpt-4-turbo*
+   gpt-4-vision*
+   gemini-pro*
+   codellama:13b
+   codellama:latest
+   falcon:latest
+   llama2:13b
+   llama2:7b-chat
+   llama2:latest
+   llava:13b
+   llava:7b
+   mistral:latest
+   phi:chat
+   vicuna:7b-16k
+   yi:34b
+```
+
 ## Info
 
 Provides information about Waldo.
