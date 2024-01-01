@@ -189,6 +189,16 @@ List of URLs returned:
 (28 seconds 222 milliseconds)
 ```
 
-# Examples
+# Image question & answer
+
+Allows you to ask questions on images using the `image` command. This only works for certain local multi-modal LLMs like Llava and Bakllava, as well as Gemini-Pro-Vision and GPT-4-Vision. If you're not using any of them, you will be asked to switch to any of them first.
+
+Once you issue the `image` command, you will be asked to add image file(s) (one or more, separated by a space). These image files will be the subject for your questions.
+
+Under `images>` prompt, when you issue the command `/clear` you will clear the image cache and Waldo will ask you to add image file(s) again.
+
+If you're running iTerm2 on MacOS, under `images>` prompt, when you issue the command `/show`, you can display the images inline.
+
+## examples video for image question answering
 
 [![Waldo image question-answering](http://img.youtube.com/vi/MYGZmpp-aUA/0.jpg)](http://www.youtube.com/watch?v=MYGZmpp-aUA)
