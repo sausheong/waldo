@@ -49,8 +49,8 @@ type PullResponse struct {
 }
 
 type ImageQuery struct {
-	Query    string `json:"query"`
-	Filepath string `json:"filepath"`
+	Query  string   `json:"query"`
+	Images []string `json:"images"`
 }
 
 type Models struct {
@@ -59,4 +59,36 @@ type Models struct {
 		ModifiedAt string `json:"modified_at"`
 		Size       int64  `json:"size"`
 	} `json:"models"`
+}
+
+// for OpenAI responses
+type OpenAIResponse struct {
+	ID      string   `json:"id"`
+	Object  string   `json:"object"`
+	Created int      `json:"created"`
+	Model   string   `json:"model"`
+	Usage   Usage    `json:"usage"`
+	Choices []Choice `json:"choices"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+type FinishDetails struct {
+	Type string `json:"type"`
+	Stop string `json:"stop"`
+}
+
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type Choice struct {
+	Message       Message       `json:"message"`
+	FinishDetails FinishDetails `json:"finish_details"`
+	Index         int           `json:"index"`
 }

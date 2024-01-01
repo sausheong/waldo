@@ -188,3 +188,7 @@ List of URLs returned:
 
 (28 seconds 222 milliseconds)
 ```
+
+# Examples
+
+[![Waldo image question-answering](http://img.youtube.com/vi/MYGZmpp-aUA/0.jpg)](http://www.youtube.com/watch?v=MYGZmpp-aUA)

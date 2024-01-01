@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -24,12 +23,14 @@ import (
 	"google.golang.org/api/option"
 )
 
+// run shell commands
 func run(tool string, args []string) ([]byte, error) {
 	fmt.Println(yellow("executing>"), green(tool), green(strings.Join(args, " ")))
 	cmd := exec.Command(tool, args...)
 	return cmd.CombinedOutput()
 }
 
+// search the Internet and retu
 func search(model string, query string) error {
 	data, result, err := ddg(query)
 	if err != nil {
@@ -39,7 +40,8 @@ func search(model string, query string) error {
 	prompt := `The following search results has come back from a search engine given the query 
 that came from a user. Respond to the original query using the search results. Do not add any 
 additional information. Assume the person you are explaining to doesn't know anything about 
-the answer.	End the response with a list of URLs returned.`
+the answer and provide a detailed response based on the query results only.	End the response 
+with a list of URLs returned.`
 	ctx := `{
 	"query" : "` + query + `",
 	"search_result" : "` + data + `",
@@ -55,6 +57,7 @@ the answer, say "I don't know the answer to this.".
 	return predict(model, prompt, query, "")
 }
 
+// prediction multiplexer
 func predict(model string, prompt string, ctx string, format string) error {
 	switch model {
 	case "gpt-3.5-turbo":
@@ -66,6 +69,8 @@ func predict(model string, prompt string, ctx string, format string) error {
 	case "gpt-4-vision":
 		return gpt("gpt-4-vision-preview", prompt, ctx, format)
 	case "gemini-pro":
+		return gemini(model, prompt, ctx, format)
+	case "gemini-pro-vision":
 		return gemini(model, prompt, ctx, format)
 	default:
 		return ollama(model, prompt, ctx, format)
@@ -223,94 +228,4 @@ func ddg(query string) (string, []SearchResult, error) {
 			"Description: %s\n\n", result.Title, result.Info)
 	}
 	return formattedResults, results, nil
-}
-
-func qa(model string, ctx string, filepath string) error {
-	prompt := `You are a helpful AI image assistant who can answer questions about
-a given image.`
-
-	req := &CompletionRequest{
-		Model:  model,
-		Prompt: prompt,
-		System: ctx,
-		Stream: true,
-	}
-
-	// Read the entire file into a byte slice
-	file, err := os.ReadFile(filepath)
-	if err != nil {
-		fmt.Println("err in getting bytes from image file", err, filepath)
-	}
-	req.Images = []string{base64.StdEncoding.EncodeToString(file)}
-
-	reqJson, err := json.Marshal(req)
-	if err != nil {
-		fmt.Println("err in marshaling:", err)
-		return err
-	}
-
-	r := bytes.NewReader(reqJson)
-	httpResp, err := http.Post("http://localhost:11435/api/generate", "application/json", r)
-	if err != nil {
-		fmt.Println("err in calling ollama:", err)
-		return err
-	}
-	decoder := json.NewDecoder(httpResp.Body)
-	t0 := time.Now()
-	for {
-		resp := &CompletionResponse{}
-		decoder.Decode(&resp)
-		fmt.Print(yellow(resp.Response))
-		if resp.Done {
-			elapsed := durafmt.Parse(time.Since(t0)).LimitFirstN(2)
-			fmt.Printf(cyan("\n\n(%s)"), elapsed)
-			break
-		}
-	}
-	return err
-}
-
-func query(model string, ctx string) (ImageQuery, error) {
-	query := ImageQuery{}
-	prompt := `You are a helpful AI image assistant who can answer questions about
-a given image. When the user asks a question about the image Return the JSON response 
-with the following format:
---
-{
-	"query" : <query from the user>
-	"filepath": <the path of the file to be queried upon>
-}
-`
-	req := &CompletionRequest{
-		Model:  model,
-		Prompt: prompt,
-		System: ctx,
-		Stream: false,
-		Format: "json",
-	}
-
-	reqJson, err := json.Marshal(req)
-	if err != nil {
-		fmt.Println("err in marshaling:", err)
-		return query, err
-	}
-
-	r := bytes.NewReader(reqJson)
-	httpResp, err := http.Post("http://localhost:11435/api/generate", "application/json", r)
-	if err != nil {
-		fmt.Println("err in calling ollama:", err)
-		return query, err
-	}
-	decoder := json.NewDecoder(httpResp.Body)
-	resp := CompletionResponse{}
-	err = decoder.Decode(&resp)
-	if err != nil {
-		log.Println("Cannot decode completion response:", err)
-		return query, err
-	}
-	err = json.Unmarshal([]byte(resp.Response), &query)
-	if err != nil {
-		log.Println("Cannot unmarshal image query:", err)
-	}
-	return query, err
 }

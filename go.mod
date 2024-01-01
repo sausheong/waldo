@@ -7,6 +7,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/generative-ai-go v0.5.0
+	github.com/h2non/filetype v1.1.3
 	github.com/hako/durafmt v0.0.0-20210608085754-5c1018a4e16b
 	github.com/jmorganca/ollama v0.1.17
 	github.com/joho/godotenv v1.5.1
@@ -54,6 +55,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pkoukk/tiktoken-go v0.1.2 // indirect
+	github.com/sashabaranov/go-openai v1.17.9 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	go.opencensus.io v0.24.0 // indirect

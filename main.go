@@ -2,13 +2,10 @@ package main
 
 import (
 	"bytes"
-	"crypto/ed25519"
-	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,15 +15,12 @@ import (
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
 	"github.com/hako/durafmt"
-	"github.com/jmorganca/ollama/format"
-	"github.com/jmorganca/ollama/server"
 	"github.com/joho/godotenv"
 	"github.com/sausheong/ishell/v2"
-	"golang.org/x/crypto/ssh"
 )
 
 var model string
-var imageFilepath string
+var images []string
 
 var cyan = color.New(color.FgCyan).SprintFunc()
 var yellow = color.New(color.FgHiYellow).SprintFunc()
@@ -114,28 +108,35 @@ func main() {
 		Name: "image",
 		Help: "ask questions about an image file",
 		Func: func(c *ishell.Context) {
+			defer c.SetPrompt(getPrompt())
 			if !isImageModel() {
-				c.Println(red("Please switch to an image model like llava or GPT4-Vision first."))
+				c.Println(red("Please switch to an image model like llava or Gemini-Pro-Vision or GPT-4-Vision first."))
 				return
 			}
+			if len(images) == 0 {
+				c.Print(cyan("image files? "))
+				imagesInput := c.ReadLine()
+				images = strings.Split(strings.TrimSpace(imagesInput), " ")
+			}
+			c.Println(yellow(getFilenames(images)))
 			c.Print(cyan("image> "))
 			line := c.ReadLine()
-			defer c.SetPrompt(getPrompt())
 			if line == "" || line == "exit" {
 				return
 			}
-			if imageFilepath == "" {
-				q, err := query(model, line)
-				if err != nil {
-					c.Println(red("error when processing image query:", err))
-					return
+			if strings.HasPrefix(line, "/clear") {
+				images = []string{}
+			} else if strings.HasPrefix(line, "/show") {
+				if os.Getenv("TERM_PROGRAM") == "iTerm.app" {
+					for _, img := range images {
+						printInlineImage(img)
+					}
+				} else {
+					fmt.Println(red("showing inline images only available on iTerm2."))
 				}
-				imageFilepath = q.Filepath
-				if q.Query != "" {
-					qa(model, q.Query, imageFilepath)
-				}
+			} else {
+				askImage(model, line, images)
 			}
-			qa(model, line, imageFilepath)
 			c.Cmd.Func(c)
 		},
 	})
@@ -208,7 +209,7 @@ func getPrompt() string {
 }
 
 func isImageModel() bool {
-	return strings.Contains(model, "llava")
+	return strings.Contains(model, "llava") || strings.Contains(model, "-vision")
 }
 
 func pullModel(name string) error {
@@ -261,7 +262,7 @@ func getModels() ([]string, error) {
 		return []string{}, err
 	}
 
-	results := []string{"gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4-vision", "gemini-pro"}
+	results := []string{"gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4-vision", "gemini-pro", "gemini-pro-vision"}
 	for _, m := range models.Models {
 		results = append(results, m.Name)
 	}
@@ -269,77 +270,16 @@ func getModels() ([]string, error) {
 	return results, nil
 }
 
-// the code below are taken from Ollama to enable the Waldo to
-// start an Ollama server within waldo
-
-// start the OllamaServer
-func startOllamaServer() error {
-	host, port, err := net.SplitHostPort(os.Getenv("OLLAMA_HOST"))
-	if err != nil {
-		host, port = "127.0.0.1", "11435"
-		if ip := net.ParseIP(strings.Trim(os.Getenv("OLLAMA_HOST"), "[]")); ip != nil {
-			host = ip.String()
-		}
+func getFilenames(filepaths []string) []string {
+	files := []string{}
+	for _, path := range filepaths {
+		files = append(files, filepath.Base(path))
 	}
-
-	if err := initializeKeypair(); err != nil {
-		return err
-	}
-
-	ln, err := net.Listen("tcp", net.JoinHostPort(host, port))
-	if err != nil {
-		return err
-	}
-
-	return server.Serve(ln)
+	return files
 }
 
-// initialize the kepair
-func initializeKeypair() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	privKeyPath := filepath.Join(home, ".ollama", "id_ed25519")
-	pubKeyPath := filepath.Join(home, ".ollama", "id_ed25519.pub")
-
-	_, err = os.Stat(privKeyPath)
-	if os.IsNotExist(err) {
-		fmt.Printf("Couldn't find '%s'. Generating new private key.\n", privKeyPath)
-		_, privKey, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			return err
-		}
-
-		privKeyBytes, err := format.OpenSSHPrivateKey(privKey, "")
-		if err != nil {
-			return err
-		}
-
-		err = os.MkdirAll(filepath.Dir(privKeyPath), 0o755)
-		if err != nil {
-			return fmt.Errorf("could not create directory %w", err)
-		}
-
-		err = os.WriteFile(privKeyPath, pem.EncodeToMemory(privKeyBytes), 0o600)
-		if err != nil {
-			return err
-		}
-
-		sshPrivateKey, err := ssh.NewSignerFromKey(privKey)
-		if err != nil {
-			return err
-		}
-
-		pubKeyData := ssh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())
-
-		err = os.WriteFile(pubKeyPath, pubKeyData, 0o644)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Your new public key is: \n\n%s\n", string(pubKeyData))
-	}
-	return nil
+func printInlineImage(filePath string) {
+	bytes, _ := os.ReadFile(filePath)
+	b64 := base64.StdEncoding.EncodeToString(bytes)
+	fmt.Printf("\x1b]1337;File=inline=1;width=256px:%s\a\n", b64)
 }
