@@ -92,11 +92,12 @@ You can switch to any of the local models that you have downloaded and added to 
 
 ```
 Your current model is llama2:7b-chat. Which model to switch to?
- ❯ gpt-3.5-turbo*
-   gpt-4*
-   gpt-4-turbo*
-   gpt-4-vision*
-   gemini-pro*
+ ❯ gpt-3.5-turbo
+   gpt-4
+   gpt-4-turbo
+   gpt-4-vision
+   gemini-pro
+   gemini-pro-vision
    codellama:13b
    codellama:latest
    falcon:latest
