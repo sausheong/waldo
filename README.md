@@ -146,6 +146,7 @@ drwxr-xr-x   28 sausheong  staff       896 Dec 29 11:11 ollama
 
 ```
 
+
 ## Ask
 
 Allows you to ask the current model any questions.
